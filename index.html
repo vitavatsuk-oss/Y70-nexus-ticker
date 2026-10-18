@@ -43,13 +43,15 @@
     --fx-scale: 1;
 
     /* ---- พื้นหลัง ----
-       transparent      = ทะลุเห็น wallpaper เต็ม ๆ
-       rgba(0,0,0,0.35) = ทินท์ดำจาง (ค่าปัจจุบัน)
-       #000000          = ดำทึบ                          */
-    --bg: rgba(0,0,0,0.35);
+       ค่าเริ่มต้นนี้ใช้เมื่อไม่ได้ใส่ ?bg= ใน URL (ดูตาราง BG ใน CONFIG)
+       หมายเหตุ: Web View ของ Nexus 3 render เป็นหน้าเว็บจริง ฐานเป็นสีขาว
+       ดังนั้นสีโปร่ง (alpha ต่ำ) จะผสมกับขาว ได้ผลเป็นเทาอ่อน ไม่ใช่ทินท์มืด
+       แบบ iframe เดิม — ถ้าอยากได้การ์ดมืด ต้องใช้ alpha สูงหรือสีทึบ   */
+    --bg: #0A0E0C;
 
-    /* เงาตัวอักษร กันกลืนพื้นหลัง — ตั้ง none ได้ถ้าใช้พื้นทึบ */
-    --shadow: 0 0.05em 0.2em rgba(0,0,0,.95), 0 0 0.55em rgba(0,0,0,.6);
+    /* เงาตัวอักษร — จำเป็นเฉพาะตอนพื้นโปร่งทับ wallpaper
+       พื้นทึบไม่ต้องใช้ ตัวอักษรคมกว่า (JS เปิดให้เองเมื่อ ?bg= เป็นสีโปร่ง) */
+    --shadow: none;
 
     --accent: var(--up);
   }
@@ -354,11 +356,43 @@ const CONFIG = {
 };
 
 /* อ่านโหมดจาก URL เช่น  index.html?mode=fx  */
+const QS = new URLSearchParams(location.search);
+
 const CONTENT = (() => {
-  const m = (new URLSearchParams(location.search).get("mode") || CONFIG.defaultContent).toLowerCase();
+  const m = (QS.get("mode") || CONFIG.defaultContent).toLowerCase();
   return ["all","compact","split","crypto","fx"].includes(m) ? m : "all";
 })();
 document.body.dataset.content = CONTENT;
+
+/* ---- พื้นหลังจาก ?bg= ----
+   ชื่อสำเร็จรูป: dark · tint · clear · black · glass
+   หรือใส่ hex เองได้: ?bg=0A0E0C  /  ?bg=000000e6 (8 หลัก = มี alpha)
+   ไม่ใส่อะไรเลย = ใช้ค่า --bg ใน :root                               */
+(function applyBg() {
+  const BG = {
+    dark:  "#0A0E0C",            // ดำอมเขียว ทึบ — ค่าแนะนำสำหรับ Web View
+    black: "#000000",            // ดำสนิท
+    tint:  "rgba(0,0,0,.92)",    // ดำเกือบทึบ
+    glass: "rgba(0,0,0,.35)",    // ทินท์จางแบบเดิมสมัย iframe (บนฐานขาวจะออกเทา)
+    clear: "transparent"         // ทดสอบว่า Web View รองรับพื้นโปร่งไหม
+  };
+
+  const raw = (QS.get("bg") || "").trim().toLowerCase();
+  if (!raw) return;
+
+  let val = BG[raw];
+  if (!val && /^[0-9a-f]{3,8}$/.test(raw)) val = "#" + raw;   // hex ล้วน ไม่ต้องใส่ #
+  if (!val) return;                                           // ค่าพิลึก = ไม่ต้องสนใจ
+
+  document.documentElement.style.setProperty("--bg", val);
+
+  // พื้นโปร่ง = ตัวอักษรอาจไปทับ wallpaper -> เปิดเงากลับมากันกลืน
+  const opaque = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(val);
+  if (!opaque) {
+    document.documentElement.style.setProperty(
+      "--shadow", "0 0.05em 0.2em rgba(0,0,0,.95), 0 0 0.55em rgba(0,0,0,.6)");
+  }
+})();
 /* ========================================================== */
 
 const BINANCE = "https://api.binance.com/api/v3";
